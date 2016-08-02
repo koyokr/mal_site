@@ -1,0 +1,5 @@
+#!/bin/bash
+
+sudo iptables -A OUTPUT -p ip -j NFQUEUE --queue-num 0
+sudo ./drop
+sudo iptables -D OUTPUT -p ip -j NFQUEUE --queue-num 0
