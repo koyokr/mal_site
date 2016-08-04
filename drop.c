@@ -1,39 +1,35 @@
 #include "struct.h"
 
 bool filter_true = false;
-pthread_t thread;
-struct nfq_handle *h;
-struct nfq_q_handle *qh;
 
-bool filter(void *data);
+int fgetline(FILE *fp);
+bool filter(FILE *fp, void *data);
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
-void *qthread() {
-	puts("\npress enter key to exit~\n");
-	getchar();
-
+inline void _close(struct nfq_handle *h, struct nfq_q_handle *qh) {
 	puts("unbinding from queue 0");
 	nfq_destroy_queue(qh);
 	puts("closing library handle");
 	nfq_close(h);
+}
 
+void *qthread(void *p) {
+	struct thread_arg *arg = (struct thread_arg *)p;
+	puts("\npress enter key to exit~\n");
+	getchar();
+	_close(arg->h, arg->qh);
 	exit(0);
 }
 
 void sig_handler(int signo) {
-	pthread_cancel(thread);
-
-	puts("\nunbinding from queue 0");
-	nfq_destroy_queue(qh);
-	puts("closing library handle");
-	nfq_close(h);
-	
 	exit(1);
 }
 
 int main() {
 	int fd, rv;
 	char buf[4096] __attribute__ ((aligned));
+	struct nfq_handle *h;
+	struct nfq_q_handle *qh;
 
 	signal(SIGINT, sig_handler);
 
@@ -49,14 +45,20 @@ int main() {
 	nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff);
 	fd = nfq_fd(h);
 
-    pthread_create(&thread, NULL, qthread, NULL);
+	FILE *fp;
+	fp = fopen("mal_site.txt", "r");
+	char buf2[fgetline(fp)][128];
+
+	struct thread_arg arg = { h, qh };
+	pthread_t thread;
+	pthread_create(&thread, NULL, qthread, (void *)&arg);
 	pthread_detach(thread);
-	
+
 	while (true) {
 		rv = recv(fd, buf, sizeof(buf), 0);
 		if (rv >= 0) {
 			/* puts("pkt received"); */
-			filter_true = filter(buf);
+			filter_true = filter(fp, buf);
 			nfq_handle_packet(h, buf, rv);
 			continue;
 		}
@@ -68,17 +70,28 @@ int main() {
 		break;
 	}
 
-    pthread_cancel(thread);
-
-	puts("\nunbinding from queue 0");
-	nfq_destroy_queue(qh);
-	puts("closing library handle");
-	nfq_close(h);
-
+	pthread_cancel(thread);
+	_close(h, qh);
 	return 0;
 }
 
-bool filter(void *data) {
+int fgetline(FILE *fp) {
+	char buf[4096];
+	char *p;
+	int size;
+	int i, line = 0;
+
+	while (!feof(fp)) {
+		size = fread(buf, 1, sizeof(buf), fp);
+		for (i = 0, p = buf; p < buf+size; p++)
+			if (*p == '\n') i++;
+		line += i;
+	}
+
+	return line;	
+}
+
+bool filter(FILE *fp, void *data) {
 	uint8_t     *cp;
 	struct ip   *ip;
 	struct tcp  *tcp;
@@ -106,7 +119,9 @@ bool filter(void *data) {
 }
 
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) {
-	struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+	struct nfqnl_msg_packet_hdr *ph;
+	ph = nfq_get_msg_packet_hdr(nfa);
+
 	if (filter_true)
 		return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
 	else

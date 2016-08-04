@@ -11,6 +11,10 @@
 #include <signal.h>
 #include <pthread.h>
 
+struct thread_arg {
+	struct nfq_handle   *h;
+	struct nfq_q_handle *qh;
+};
 
 struct ip {
 	uint8_t  len_h:4, ver:4; /* little endian */
