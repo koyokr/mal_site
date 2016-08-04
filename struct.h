@@ -1,13 +1,16 @@
-#pragma once
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
+
 #include <netinet/in.h>
-#include <linux/types.h>
 #include <linux/netfilter.h>
+#include <libnetfilter_queue/libnetfilter_queue.h>
+
 #include <errno.h>
 #include <signal.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
+#include <pthread.h>
+
 
 struct ip {
 	uint8_t  len_h:4, ver:4; /* little endian */
@@ -41,3 +44,4 @@ struct http {
 #define STRING_GET 0x20544547 /* little endian */
 	uint8_t *host;
 };
+
