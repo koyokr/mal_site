@@ -44,7 +44,7 @@ struct tcp {
 };
 
 struct http {
-	uint32_t *get;
+	uint8_t *get;
 #define STRING_GET 0x20544547 /* little endian */
 	uint8_t *host;
 };

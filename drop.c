@@ -36,9 +36,15 @@ int _strlen(const char *str) {
 }
 
 char *_strcpy(char *dst, const char *src) {
-	while (*src != '\0')
-		*dst++ = *src++;
-	*dst = *src;
+	while (*src != '\0') *dst++ = *src++;
+	*dst = '\0';
+	return dst;
+}
+
+char *_strcat(char *dst, const char *src) {
+	while (*dst != '\0') dst++;
+	while (*src != '\0') *dst++ = *src++;
+	*dst = '\0';
 	return dst;
 }
 
@@ -155,7 +161,7 @@ int fgetlinelen(FILE *fp) {
 	int size;
 	int i, linelen = 0;
 
-	while(!feof(fp)) {
+	while (!feof(fp)) {
 		size = fread(buf, 1, sizeof(buf), fp);
 		for (i = 0, p = buf; p < buf+size; i++, p++)
 			if (*p == '\n') {
@@ -168,28 +174,34 @@ int fgetlinelen(FILE *fp) {
 }
 
 char *gethost(void *data) {
-	uint8_t     *cp;
+	uint8_t     *p;
 	struct ip   *ip;
 	struct tcp  *tcp;
 	struct http  http;
 
-	ip = (struct ip *)((char *)data + 44);
+	ip = (struct ip *)((uint8_t *)data + 44);
 	if (ip->ver != IPV4_VERSION) return NULL;
 	if (ip->pro != PROTOCOL_TCP) return NULL;
 
-	tcp = (struct tcp *)((char *)ip + ip->len_h * 4);
-	http.get = (uint32_t *)((char *)tcp + tcp->off * 4);
+	tcp = (struct tcp *)((uint8_t *)ip + ip->len_h * 4);
+	http.get = (uint8_t *)tcp + tcp->off * 4;
 	if (ntohs(ip->len_t) <= 40) return NULL;
-	if (*http.get != STRING_GET) return NULL;
+	if (*(uint32_t *)http.get != STRING_GET) return NULL;
 
-	cp = (uint8_t *)http.get;
-	while (*cp++ != '\r');
-	if (*cp++ != '\n') return NULL;
+	p = http.get;
+	while (*p++ != '\r');
+	if (*p++ != '\n') return NULL;
+	*(p-11) = '\0';
 
-	http.host = cp += 6;
-	while (*cp != '\r') cp++;
-	*cp = '\0';
-	//printf("%s\n", http.host);
+	http.host = p += 6;
+	http.get += 4;
+	while (*p != '\r') p++;
+	*p = '\0';
+
+	if (*(http.get+1) != '\0')
+		_strcat(http.host, http.get);
+
+	/* printf("%s\n", http.host); */
 
 	return http.host;
 }
