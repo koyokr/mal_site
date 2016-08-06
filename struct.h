@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include <netinet/in.h>
 #include <linux/netfilter.h>
@@ -11,6 +14,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
+
 
 struct thread_arg {
 	struct nfq_handle   *h;
@@ -50,3 +54,13 @@ struct http {
 	uint8_t *host;
 };
 
+
+uint64_t fgetsize(int *fd);
+int getwidth(const char *buf);
+int getwidth_deep(const char *buf);
+
+bool gethost(char *data, struct http *http);
+static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
+
+int _strcmp(const void *a, const void *b);
+int _strcmp2(const void *key, const void *str);

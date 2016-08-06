@@ -2,7 +2,7 @@ drop: drop.o func.o
 	gcc -o drop drop.o func.o -lnetfilter_queue -lpthread
 
 drop.o: drop.c struct.h
-	gcc -O2 -c drop.c
+	gcc -O2 -c drop.c -Wno-unused-result
 
 func.o: func.c struct.h
 	gcc -O2 -c func.c
