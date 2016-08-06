@@ -1,6 +1,7 @@
 #include "struct.h"
 
 bool filter = false;
+static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
 void sig_handler(int signo) {
 	exit(1);
@@ -49,37 +50,18 @@ int main() {
 	int fd;
 	uint64_t fsize;
 
-	/* Open mal_site1.dat: host list */
-	fd = open("mal_site1.dat", O_RDONLY);
+	/* Open top-1m */
+	fd = open("top-1m", O_RDONLY);
 	fsize = fgetsize(&fd);
-	char fbuf1[fsize];
-	read(fd, fbuf1, fsize);
+	char *p = (char *)malloc(fsize);
+	read(fd, p, fsize);
 	close(fd);
 
-	int w1, h1; /* width, height */
-	w1 = getwidth(fbuf1);
-	h1 = fsize / w1;
-	fbuf1[w1-1] = '\0';
-	char (*pbuf1)[w1] = (char (*)[w1])fbuf1;
-
-	/* Open mal_site2.dat: get list */
-	fd = open("mal_site2.dat", O_RDONLY);
-	fsize = fgetsize(&fd);
-	char fbuf2[fsize];
-	read(fd, fbuf2, fsize);
-	close(fd);
-
-	int w2, h2, d2; /* width, height, depth */
-	w2 = getwidth(fbuf2);
-	h2 = getwidth_deep(fbuf2) / w2;
-	d2 = fsize / (w2 * h2);
-	fbuf2[w2*h2-1] = fbuf2[w2-1] = '\0';
-	char (*pbuf2)[h2][w2] = (char (*)[h2][w2])fbuf2;
-
-	/* Print mal_site1 */
-	/* for (int i = 0; i < h1; i++) printf("%s\n", pbuf1[i]); */
-	/* Print mal_site2 */
-	/* for (int i = 0; i < d2; i++) { for (int j = 0; j < h2; j++) printf("[%d]%s  ", j, pbuf2[i][j]); printf("\n"); }; */
+	int _w, _h; /* width, height */
+	_w = getwidth(p);
+	_h = fsize / _w;
+	p[_w-1] = '\0';
+	char (*pp)[_w] = (char (*)[_w])p;
 
 	/* Threading for exit */
 	struct thread_arg arg = { h, qh };
@@ -88,8 +70,7 @@ int main() {
 	pthread_detach(thread);
 
 	/* Receive packet */
-	struct http http;
-	char *tbuf;
+	char *host;
 	while (true) {
 		rv = recv(nfd, buf, BUF_SIZE, 0);
 		if (rv < 0)
@@ -103,16 +84,12 @@ int main() {
 			}
 
 		/* Packet received */
-		if (gethost(buf, &http)) /* http */
-			if (bsearch(http.host, pbuf1, h1, w1, _strcmp)) /* filter host */
-				if (tbuf = bsearch(http.host, pbuf2, d2, w2*h2, _strcmp)) /* host have get filter */
-					if (bsearch(http.get, tbuf, h2, w2, _strcmp2)) filter = true; /* filter get */
-					else filter = false;
-				else filter = true;
-			else filter = false;
-		else filter = false;
+		if (gethost(buf, host) && bsearch(host, pp, _h, _w, _strcmp))
+			filter = true;
+		else
+			filter = false;
 
-		if (filter) printf("\x1b[31m[BLOCK]\x1b[0m %s %s\n", http.host, http.get);
+		if (filter) printf("\x1b[31m[BLOCK]\x1b[0m %s\n", host);
 		nfq_handle_packet(h, buf, rv);
 	}
 

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -48,19 +49,10 @@ struct tcp {
 	uint16_t urp;
 };
 
-struct http {
-	uint8_t *get;
 #define STRING_GET 0x20544547 /* little endian */
-	uint8_t *host;
-};
 
 
 uint64_t fgetsize(int *fd);
 int getwidth(const char *buf);
-int getwidth_deep(const char *buf);
-
-bool gethost(char *data, struct http *http);
-static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
-
 int _strcmp(const void *a, const void *b);
-int _strcmp2(const void *key, const void *str);
+bool gethost(char *data, char *host);
