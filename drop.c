@@ -2,10 +2,9 @@
 
 bool filter = false;
 
-int fgetline(FILE *fp);
-int fgetlinelen(FILE *fp);
+void fgetlen(FILE *fp, int *line, int *hostlen, int *getlen);
 
-char *gethost(void *data);
+bool gethost(void *data, struct http *http);
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
 inline void _close(struct nfq_handle *h, struct nfq_q_handle *qh) {
@@ -41,11 +40,13 @@ char *_strcpy(char *dst, const char *src) {
 	return dst;
 }
 
-char *_strcat(char *dst, const char *src) {
-	while (*dst != '\0') dst++;
-	while (*src != '\0') *dst++ = *src++;
-	*dst = '\0';
-	return dst;
+bool _strstr_(const char *str, char *key) {
+	while (*str == *key && *str != '\0') {
+		str++;
+		key++;
+		if (*key == '\0') return true;
+	}
+	return false;
 }
 
 int _strcmp(const void *a, const void *b) {
@@ -79,50 +80,56 @@ int main() {
 	FILE *fp;
 	fp = fopen("mal_site.txt", "r");
 
-	int line, linelen;
-	line = fgetline(fp);
+	int line, hostlen, getlen;
+	fgetlen(fp, &line, &hostlen, &getlen);
 	fseek(fp, 0, SEEK_SET);
-	linelen = fgetlinelen(fp) + 1;
-	fseek(fp, 0, SEEK_SET);
-
-	char site[line][linelen];
+		printf("%d %d %d\n", line, hostlen, getlen);
+	char site_host[line][hostlen+1];
+	char site_get[line][getlen+1];
 	for (int i = 0; i < line; i++) {
-		char buf_temp[linelen];
-		if (fgets(buf_temp, linelen, fp) == NULL) break;
-		if (buf_temp[_strlen(buf_temp)-2] == '/')
-			buf_temp[_strlen(buf_temp)-2] = '\0';
-		else
-			buf_temp[_strlen(buf_temp)-1] = '\0';
-		_strcpy(site[i], buf_temp + 7);
+		char buf_temp[hostlen+getlen+2];
+		char *p;
+		p = buf_temp + 7;
+
+		if (fgets(buf_temp, hostlen+getlen+2, fp) == NULL) break;
+		buf_temp[_strlen(buf_temp)-1] = '\0';
+
+		while (*p != '/' && *p != '\0') p++;
+		if (*p == '\0') {
+			site_get[i][0] = '/';
+			site_get[i][1] = '\0';
+		}
+		else _strcpy(site_get[i], p);
+		*p = '\0';
+		//printf("%s\n", buf_temp + 7);
+		_strcpy(site_host[i], buf_temp + 7);
 	}
 	fclose(fp);
 
-	qsort(site, line, linelen, _strcmp);
-	//bsearch(key, site, line, linelen, _strcmp);
-
+	//qsort(site_host, line, hostlen+1, _strcmp);
 	/* test */
-	/*for (int i = 0; i < line; i++)
-	 *	printf("%s\n", site[i]);
-	 */
+	//for (int i = 0; i < line; i++) printf("%s %s\n", site_host[i], site_get[i]);
 
 	struct thread_arg arg = { h, qh };
 	pthread_t thread;
 	pthread_create(&thread, NULL, qthread, (void *)&arg);
 	pthread_detach(thread);
 
-	char *host;
+	struct http http;
 	while (true) {
+		char *buf_temp;
 		rv = recv(fd, buf, sizeof(buf), 0);
 		if (rv >= 0) {
 			/* puts("pkt received"); */
-			host = gethost(buf);
-			if (host != NULL)
-				if (bsearch(host, site, line, linelen, _strcmp) != NULL) {
-					printf("\x1b[31m[BLOCK]\x1b[0m %s\n", host);
+			if (gethost(buf, &http)) {
+				buf_temp = bsearch(http.host, site_host, line, hostlen+1, _strcmp);
+				if (buf_temp != NULL && _strstr_(http.get, site_get[(buf_temp-*site_host)/(hostlen+1)])) {
+					printf("\x1b[31m[BLOCK]\x1b[0m %s %s\n", http.host, http.get);
 					filter = true;
 				}
-				else
-					filter = false;
+				else filter = false;
+			}
+			else filter = false;
 			nfq_handle_packet(h, buf, rv);
 			continue;
 		}
@@ -139,71 +146,63 @@ int main() {
 	return 0;
 }
 
-int fgetline(FILE *fp) {
+void fgetlen(FILE *fp, int *line, int *hostlen, int *getlen) {
 	char buf[4096];
 	char *p;
 	int size;
-	int i, line = 0;
+	int i = 0, j = 0;
+	*line = *hostlen = *getlen = 0;
 
 	while (!feof(fp)) {
 		size = fread(buf, 1, sizeof(buf), fp);
-		for (i = 0, p = buf; p < buf+size; p++)
-			if (*p == '\n') i++;
-		line += i;
-	}
-
-	return line;	
-}
-
-int fgetlinelen(FILE *fp) {
-	char buf[4096];
-	char *p;
-	int size;
-	int i, linelen = 0;
-
-	while (!feof(fp)) {
-		size = fread(buf, 1, sizeof(buf), fp);
-		for (i = 0, p = buf; p < buf+size; i++, p++)
-			if (*p == '\n') {
-				if (linelen < i) linelen = i;
-				i = 0;
+		for (p = buf + 7; p < buf + size; i++, p++) {
+			if (*p == '/') {
+				if (*hostlen < i && j == 0) {
+					*hostlen = i;
+				}
+				j = i + 1;
 			}
+			if (*p == '\n') {
+				(*line)++;
+				if (*hostlen < i && j == 0) {
+					*hostlen = i;
+				}
+				if (*getlen < (i - j)) {
+					*getlen = i - j;
+				}
+				p += 8;
+				i = 0;
+				j = 0;
+			}
+		}
 	}
-
-	return linelen;
 }
 
-char *gethost(void *data) {
+bool gethost(void *data, struct http *http) {
 	uint8_t     *p;
 	struct ip   *ip;
 	struct tcp  *tcp;
-	struct http  http;
 
 	ip = (struct ip *)((uint8_t *)data + 44);
-	if (ip->ver != IPV4_VERSION) return NULL;
-	if (ip->pro != PROTOCOL_TCP) return NULL;
+	if (ip->ver != IPV4_VERSION) return false;
+	if (ip->pro != PROTOCOL_TCP) return false;
 
 	tcp = (struct tcp *)((uint8_t *)ip + ip->len_h * 4);
-	http.get = (uint8_t *)tcp + tcp->off * 4;
-	if (ntohs(ip->len_t) <= 40) return NULL;
-	if (*(uint32_t *)http.get != STRING_GET) return NULL;
+	http->get = (uint8_t *)tcp + tcp->off * 4;
+	if (ntohs(ip->len_t) <= 40) return false;
+	if (*(uint32_t *)http->get != STRING_GET) return false;
 
-	p = http.get;
+	p = http->get;
 	while (*p++ != '\r');
-	if (*p++ != '\n') return NULL;
+	if (*p++ != '\n') return false;
 	*(p-11) = '\0';
 
-	http.host = p += 6;
-	http.get += 4;
+	http->host = p += 6;
+	http->get += 4;
 	while (*p != '\r') p++;
 	*p = '\0';
 
-	if (*(http.get+1) != '\0')
-		_strcat(http.host, http.get);
-
-	/* printf("%s\n", http.host); */
-
-	return http.host;
+	return true;
 }
 
 static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) {
