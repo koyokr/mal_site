@@ -49,10 +49,13 @@ struct tcp {
 	uint16_t urp;
 };
 
+struct http {
 #define STRING_GET 0x20544547 /* little endian */
+	uint8_t *host;
+};
 
 
 uint64_t fgetsize(int *fd);
 int getwidth(const char *buf);
 int _strcmp(const void *a, const void *b);
-bool gethost(char *data, char *host);
+bool gethost(char *data, struct http *http);

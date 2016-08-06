@@ -24,7 +24,7 @@ int _strcmp(const void *a, const void *b) {
 
 /* Get get, host */
 #define NETFILTER_IP_INDEX 44
-bool gethost(char *data, char *host) {
+bool gethost(char *data, struct http *http) {
 	uint8_t     *p;
 	struct ip   *ip;
 	struct tcp  *tcp;
@@ -46,7 +46,7 @@ bool gethost(char *data, char *host) {
 	if (*p++ != '\n') return false;
 
 	/* http: host */
-	host = p += 6;
+	http->host = p += 6;
 	while (*p != '\r') p++;
 	*p = '\0';
 

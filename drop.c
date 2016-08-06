@@ -70,7 +70,7 @@ int main() {
 	pthread_detach(thread);
 
 	/* Receive packet */
-	char *host;
+	struct http http;
 	while (true) {
 		rv = recv(nfd, buf, BUF_SIZE, 0);
 		if (rv < 0)
@@ -84,12 +84,10 @@ int main() {
 			}
 
 		/* Packet received */
-		if (gethost(buf, host) && bsearch(host, pp, _h, _w, _strcmp))
-			filter = true;
-		else
-			filter = false;
+		if (gethost(buf, &http) && bsearch(http.host, pp, _h, _w, _strcmp)) filter = true;
+		else filter = false;
 
-		if (filter) printf("\x1b[31m[BLOCK]\x1b[0m %s\n", host);
+		if (filter) printf("\x1b[31m[BLOCK]\x1b[0m %s\n", http.host);
 		nfq_handle_packet(h, buf, rv);
 	}
 
