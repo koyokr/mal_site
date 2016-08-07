@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
 	char (*pp)[_w] = (char (*)[_w])p;
 
 	/* Open log */
-	fd = open("log", O_WRONLY | O_APPEND | O_CREAT, 0664);
+	fd = open("log", O_WRONLY | O_APPEND | O_CREAT, 0666);
 
 	/* Threading for exit */
 	struct thread_arg arg = { h, qh, fd, p };
