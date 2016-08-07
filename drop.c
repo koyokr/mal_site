@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
 	/* Receive packet */
 	struct http http;
 	struct timespec start, end;
-	float dtime;
+	uint64_t sec, nsec;
 	while (true) {
 		rv = recv(nfd, buf, BUF_SIZE, 0);
 		if (rv < 0)
@@ -96,8 +96,9 @@ int main(int argc, char *argv[]) {
 			else filter = false;
 			clock_gettime(CLOCK_MONOTONIC, &end);
 
-			dtime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)/1000000000;
-			printf("%.6fs elapsed.\n", dtime);
+			sec  = end.tv_sec -  start.tv_sec;
+			nsec = end.tv_nsec - start.tv_nsec;
+			printf("time: %lu.%09lusec\n", sec, nsec);
 		} else filter = false;
 
 		if (filter) {
