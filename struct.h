@@ -15,11 +15,14 @@
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
+#include <time.h>
 
 
 struct thread_arg {
 	struct nfq_handle   *h;
 	struct nfq_q_handle *qh;
+	int fd;
+	char *heap;
 };
 
 struct ip {
@@ -55,7 +58,7 @@ struct http {
 };
 
 
-uint64_t fgetsize(int *fd);
+uint64_t fgetsize(int fd);
 int getwidth(const char *buf);
 int _strcmp(const void *a, const void *b);
 bool gethost(char *data, struct http *http);

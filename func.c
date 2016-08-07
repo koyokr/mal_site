@@ -1,9 +1,9 @@
 #include "struct.h"
 
 /* Get file size */
-uint64_t fgetsize(int *fd) {
+uint64_t fgetsize(int fd) {
 	struct stat info;
-	if (fstat(*fd, &info) != 0) {
+	if (fstat(fd, &info) != 0) {
 		perror("fstat() error\n");
 		exit(1);
 	}

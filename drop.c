@@ -7,7 +7,9 @@ void sig_handler(int signo) {
 	exit(1);
 }
 
-void _close(struct nfq_handle *h, struct nfq_q_handle *qh) {
+void _close(struct nfq_handle *h, struct nfq_q_handle *qh, int fd, char *heap) {
+	close(fd);
+	free(heap);
 	puts("unbinding from queue 0");
 	nfq_destroy_queue(qh);
 	puts("closing library handle");
@@ -19,13 +21,12 @@ void *qthread(void *p) {
 	puts("[!] press enter key to exit~");
 	/* Enter */
 	getchar();
-	_close(arg->h, arg->qh);
+	_close(arg->h, arg->qh, arg->fd, arg->heap);
 	exit(0);
 }
 
 #define BUF_SIZE 4096
-
-int main() {
+int main(int argc, char *argv[]) {
 	int nfd, rv;
 	struct nfq_handle *h;
 	struct nfq_q_handle *qh;
@@ -52,7 +53,7 @@ int main() {
 
 	/* Open top-1m */
 	fd = open("top-1m", O_RDONLY);
-	fsize = fgetsize(&fd);
+	fsize = fgetsize(fd);
 	char *p = (char *)malloc(fsize);
 	read(fd, p, fsize);
 	close(fd);
@@ -63,14 +64,19 @@ int main() {
 	p[_w-1] = '\0';
 	char (*pp)[_w] = (char (*)[_w])p;
 
+	/* Open log */
+	fd = open("log", O_WRONLY | O_APPEND | O_CREAT, 0664);
+
 	/* Threading for exit */
-	struct thread_arg arg = { h, qh };
+	struct thread_arg arg = { h, qh, fd, p };
 	pthread_t thread;
 	pthread_create(&thread, NULL, qthread, (void *)&arg);
 	pthread_detach(thread);
 
 	/* Receive packet */
 	struct http http;
+	struct timespec start, end;
+	float dtime;
 	while (true) {
 		rv = recv(nfd, buf, BUF_SIZE, 0);
 		if (rv < 0)
@@ -84,15 +90,27 @@ int main() {
 			}
 
 		/* Packet received */
-		if (gethost(buf, &http) && bsearch(http.host, pp, _h, _w, _strcmp)) filter = true;
-		else filter = false;
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		if (gethost(buf, &http)) { /* http */
+			if (bsearch(http.host, pp, _h, _w, _strcmp)) filter = true;
+			else filter = false;
+			clock_gettime(CLOCK_MONOTONIC, &end);
 
-		if (filter) printf("\x1b[31m[BLOCK]\x1b[0m %s\n", http.host);
+			dtime = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)/1000000000;
+			printf("%.6fs elapsed.\n", dtime);
+		} else filter = false;
+
+		if (filter) {
+			char tbuf[25+_w];
+			sprintf(tbuf, "\x1b[31m[BLOCK]\x1b[0m %s\n", http.host);
+			printf("%s", tbuf);
+			write(fd, tbuf, strlen(tbuf));
+		}
 		nfq_handle_packet(h, buf, rv);
 	}
 
 	pthread_cancel(thread);
-	_close(h, qh);
+	_close(h, qh, fd, p);
 	return 0;
 }
 
