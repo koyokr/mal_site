@@ -76,7 +76,8 @@ int main(int argc, char *argv[]) {
 	/* Receive packet */
 	struct http http;
 	struct timespec start, end;
-	uint64_t sec, nsec;
+	uint64_t sec;
+	int64_t nsec;
 	while (true) {
 		rv = recv(nfd, buf, BUF_SIZE, 0);
 		if (rv < 0)
@@ -97,8 +98,8 @@ int main(int argc, char *argv[]) {
 			clock_gettime(CLOCK_MONOTONIC, &end);
 
 			sec  = end.tv_sec -  start.tv_sec;
-			nsec = end.tv_nsec - start.tv_nsec;
-			printf("time: %lu.%09lusec\n", sec, nsec);
+			nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+			printf("time: %lu.%09ldsec\n", sec, nsec);
 		} else filter = false;
 
 		if (filter) {
