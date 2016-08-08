@@ -98,7 +98,8 @@ int main(int argc, char *argv[]) {
 			clock_gettime(CLOCK_MONOTONIC, &end);
 
 			sec  = end.tv_sec -  start.tv_sec;
-			nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+			nsec = end.tv_nsec - start.tv_nsec;
+			if (nsec < 0) nsec += 1000000000;
 			printf("time: %lu.%09ldsec\n", sec, nsec);
 		} else filter = false;
 
